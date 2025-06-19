@@ -1,0 +1,6 @@
+
+# Visual Studio cache, IDE files, and database
+.vs/
+*.VC.db
+*.VC.opendb
+
