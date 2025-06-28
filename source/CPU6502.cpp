@@ -36,3 +36,136 @@ uint8_t	CPU6502::read(uint16_t	a) {
 void CPU6502::write(uint16_t addr, uint8_t data) {
 	bus->write(addr, data);
 }
+
+void CPU6502::clock() {
+	if (cycles == 0) {
+		//fetch
+		opcode = read(pc);
+		//implement pc
+		pc++;
+		//get number of cycles for instruction
+
+
+		uint8_t	additionalCycles1 = (this->*lookup[opcode].addrmode)();
+		uint8_t	additionalCycles2 = (this->*lookup[opcode].operate)();
+
+		cycles += (additionalCycles1 & additionalCycles2);
+
+		//execute
+
+	}
+	cycles--;
+}
+
+
+
+//addressing modes
+//immediate address operand is next byte 
+uint8_t CPU6502::IMM() {
+	addr_abs = pc++;
+	return 0;
+}
+//implied no data is returned but may be operating on accumalator
+uint8_t CPU6502::IMP() {
+	fetched = a;
+	return 0;
+}
+uint8_t CPU6502::ZP0() {
+   //get operand
+	addr_abs = read(pc);
+	pc++;
+	addr_abs &= 0x0FF;
+	return	0;
+}
+
+uint8_t CPU6502::ZPX() {
+	//get	operand	add	x	register	to	it	and	wrap	back	to	zero	page
+	addr_abs = (read(pc) + x);
+	addr_abs	&= 0x0FF;
+	pc++;
+	return	0;
+}
+
+uint8_t CPU6502::ZPY() {
+	//get	operand	add	y	register	to	it	and	wrap	back	to	zero	page
+	addr_abs = (read(pc) + y);
+	addr_abs &= 0x0FF;
+	pc++;
+	return	0;
+}
+
+uint8_t CPU6502::ABS() {
+	uint16_t	lo = read(pc++),
+		hi=read(pc++);
+	addr_abs = (hi << 8) | lo;
+		
+	return	0;
+}
+uint8_t CPU6502::ABX() {
+	uint16_t	lo = read(pc++),
+		hi = read(pc++);
+	addr_abs = ((hi << 8) | lo)	+	x;
+	//check if page boundary was crossed if so add extra clock cycle
+	if ((addr_abs & 0xFF00) != (hi << 8)) {
+		return 1;  
+	}
+
+	return	0;
+}
+uint8_t CPU6502::ABY() {
+	uint16_t	lo = read(pc++),
+		hi = read(pc++);
+	addr_abs = ((hi << 8) | lo) + y;
+	//check if page boundary was crossed if so add extra clock cycle
+	if ((addr_abs & 0xFF00) != (hi << 8)) {
+		return 1;
+	}
+
+	return	0;
+}
+uint8_t CPU6502::IND() {
+	uint16_t	ptr_lo = read(pc++),
+		ptr_hi = read(pc++);
+	uint16_t ptr = ((ptr_hi << 8) | ptr_lo);
+	//simulate page boundary  bug
+	if (ptr == 0xFF) {
+		uint16_t lo = read(ptr), hi = read(ptr & 0xFF00); //high byte wraps within page
+		addr_abs = (hi << 8) | lo;
+	}
+	else {
+		uint16_t lo = read(ptr), hi = read(ptr + 1);
+		addr_abs = (hi << 8) | lo ;
+	}
+	return 0;
+}
+uint8_t CPU6502::IZX() {
+   // get index pointer to the zero page
+	uint16_t t = (read(pc++) + x) & 0x00FF;
+	//get lo bytefrom zero page
+	uint16_t lo = read(t & 0x00FF),
+		hi = read((t + 1) & 0x00FF);
+	addr_abs = (hi << 8) | lo;
+}
+uint8_t CPU6502::IZY() {
+	uint16_t t = read(pc++); //get ptr from  instruction
+	//get lo and hi byte
+	uint16_t lo = read(t & 0x00FF),
+		hi = read((t + 1) & 0x00FF);
+	uint16_t base  = (hi << 8) | lo;
+	addr_abs = base + y;
+	//if	page	boundary	breached	increment	cycles
+	if ((addr_abs & 0xFF00) != (hi<<8)) {
+		return 1;
+	}
+	return 0;
+}
+uint8_t	CPU6502::REL() {
+	addr_rel = read(pc++);
+	//check	the	value	of	7th	bit	if	its	1	its	negative
+	if (addr_rel & 0x80) {
+		addr_rel |= 0xFF00;
+	}
+	return	0;
+}
+
+//instructions
