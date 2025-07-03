@@ -13,6 +13,10 @@ class CPU6502
 	public:
 	CPU6502();
 	~CPU6502();
+	//connect bus
+	void connectBus(Bus* b) {
+		bus = b;
+	}
 	uint8_t a = 0x00  //acculator
 		, x = 0x00  //x register
 		, y = 0x00    // y register
@@ -26,7 +30,7 @@ class CPU6502
 	void nmi();
 
 	enum FLAGS6502 {
-		C = (1 << 0), // Carry Bit
+		C = (1 << 0), // Carry Bit  
 		Z = (1 << 1), // Zero
 		I = (1 << 2), // Disable Interrupts
 		D = (1 << 3), // Decimal Mode (Ignored on NES)
@@ -39,8 +43,10 @@ private:
 
 	uint8_t fetch();
 	uint8_t fetched = 0x00;
-	uint16_t addr_abs = 0x0000, addr_rel = 0x00;
+	uint16_t addr_abs = 0x0000,
+		addr_rel = 0x00;  //branch insructions can only jump a certain distance from where its called.
 	uint8_t opcode = 0x00;
+	uint8_t	cycles = 0;
 	//Addressing	Modes
 	uint8_t	IMP();	uint8_t	IMM();
 	uint8_t	ZP0();	uint8_t	ZPX();
@@ -68,6 +74,7 @@ private:
 	uint8_t TSX(); uint8_t TXA(); uint8_t TXS(); uint8_t TYA();
 
 	uint8_t XXX();  // for the illegal instructions
+	
 	struct Instruction {
 		std::string	name;
 		uint8_t cycles = 0;

@@ -3,7 +3,7 @@
 
 CPU6502::CPU6502() {
 	using a = CPU6502;
-
+	//resembles the table from nes wiki
 	lookup =
 	{
 		{ "BRK", &a::BRK, &a::IMM, 7 },{ "ORA", &a::ORA, &a::IZX, 6 },{ "???", &a::XXX, &a::IMP, 2 },{ "???", &a::XXX, &a::IMP, 8 },{ "???", &a::NOP, &a::IMP, 3 },{ "ORA", &a::ORA, &a::ZP0, 3 },{ "ASL", &a::ASL, &a::ZP0, 5 },{ "???", &a::XXX, &a::IMP, 5 },{ "PHP", &a::PHP, &a::IMP, 3 },{ "ORA", &a::ORA, &a::IMM, 2 },{ "ASL", &a::ASL, &a::IMP, 2 },{ "???", &a::XXX, &a::IMP, 2 },{ "???", &a::NOP, &a::IMP, 4 },{ "ORA", &a::ORA, &a::ABS, 4 },{ "ASL", &a::ASL, &a::ABS, 6 },{ "???", &a::XXX, &a::IMP, 6 },
@@ -57,9 +57,30 @@ void CPU6502::clock() {
 	cycles--;
 }
 
+void CPU6502::reset() {
+	//reset the 3 registers
+	a = 0;
+	x = 0;
+	y = 0;
+	//reset stack pointer it grows downward from 0xFF to 0x00 leaves room for special stuff so we want to start at 0x
+	sp = 0xFD;
+	status = 0x00 | U;
+	//reset abs addr to a particular value
+	addr_abs = 0xFFFC;
+	// get the pc from memory
+	uint16_t lo = read(addr_abs),hi = read(addr_abs + 1);
+	pc = (hi << 8) | lo;
+	// reset the fetch value and the stored addresses
+	fetched = 0x00;
+	addr_abs = 0x0000;
+	addr_rel = 0x0000;
+	//simulate the delay needed for reset
+	cycles = 8;
+}
 
 
-//addressing modes
+
+//12 addressing modes
 //immediate address operand is next byte 
 uint8_t CPU6502::IMM() {
 	addr_abs = pc++;
@@ -70,14 +91,17 @@ uint8_t CPU6502::IMP() {
 	fetched = a;
 	return 0;
 }
+// zero page 
 uint8_t CPU6502::ZP0() {
    //get operand
 	addr_abs = read(pc);
+	//increment program counter
 	pc++;
+	//ensure its the zero page
 	addr_abs &= 0x0FF;
 	return	0;
 }
-
+//zero page page with x off set 
 uint8_t CPU6502::ZPX() {
 	//get	operand	add	x	register	to	it	and	wrap	back	to	zero	page
 	addr_abs = (read(pc) + x);
@@ -85,15 +109,15 @@ uint8_t CPU6502::ZPX() {
 	pc++;
 	return	0;
 }
-
+//zero page page with y off set 
 uint8_t CPU6502::ZPY() {
-	//get	operand	add	y	register	to	it	and	wrap	back	to	zero	page
+	//get	operand	add	y register	to	it	and	wrap	back	to	zero	page
 	addr_abs = (read(pc) + y);
 	addr_abs &= 0x0FF;
 	pc++;
 	return	0;
 }
-
+//absolute address needs a 16 bit number gets lo and high byte then combinds them for complete address
 uint8_t CPU6502::ABS() {
 	uint16_t	lo = read(pc++),
 		hi=read(pc++);
@@ -101,17 +125,20 @@ uint8_t CPU6502::ABS() {
 		
 	return	0;
 }
+//absolute address needs a 16 bit number gets lo and high byte then combinds them for complete address adds a x offset
 uint8_t CPU6502::ABX() {
 	uint16_t	lo = read(pc++),
 		hi = read(pc++);
 	addr_abs = ((hi << 8) | lo)	+	x;
-	//check if page boundary was crossed if so add extra clock cycle
+	//check if page boundary was crossed if so add extra clock cycle  wrap around needs additional clock cyclr
 	if ((addr_abs & 0xFF00) != (hi << 8)) {
 		return 1;  
 	}
 
 	return	0;
 }
+//absolute address needs a 16 bit number gets lo and high byte then combinds them for complete address adds a x offset
+
 uint8_t CPU6502::ABY() {
 	uint16_t	lo = read(pc++),
 		hi = read(pc++);
@@ -169,3 +196,296 @@ uint8_t	CPU6502::REL() {
 }
 
 //instructions
+uint8_t CPU6502::fetch() {
+	if (lookup[opcode].addrmode != IMM) {
+		//get value instruction will use from the address
+		fetched = read(addr_abs);
+	}
+	return fetched;
+}
+uint8_t CPU6502::CLC() {
+	//sets carry flag to 0
+	setFlag(C, false);
+	return 0;
+}
+uint8_t CPU6502::CLD() {
+	//sets carry flag to 0
+	setFlag(D, false);
+	return 0;
+}uint8_t CPU6502::CLI() {
+	//sets carry flag to 0
+	setFlag(I, false);
+	return 0;
+}uint8_t CPU6502::CLV() {
+	//sets carry flag to 0
+	setFlag(V, false);
+	return 0;
+}
+uint8_t CPU6502::AND() {
+	//fetch
+	fetch();
+	//and with val in accumulator
+	a &= fetched;
+	//and affects the zero and negative flag so reset them
+	//if result of and is all zeros set zero flag
+	setFlag(Z, a == 0x00); 
+	//if bit 7 is 1 set N flag
+	setFlag(N, a & 0x80);
+	return 1; // may add a cycle depending on addr mode
+}
+
+//   branching
+//will directly impact clock cycles
+
+//branch  if cary is set
+uint8_t CPU6502::BCS() {
+	if (getFlag(C) == 1) {
+		//add a cycle for branch
+		cycles++;
+		//set abs address to pc + jump offset 
+		addr_abs = pc + addr_rel;
+		// if page boundary cross add a cycle
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+//branch if cary clear
+uint8_t CPU6502::BCC() {
+	//branch  if cary is set
+	if (getFlag(C) == 0) {
+		//add a cycle for branch
+		cycles++;
+		//set abs address to pc + jump offset 
+		addr_abs = pc + addr_rel;
+		// if page boundary cross add a cycle
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+//branch if equal
+uint8_t CPU6502::BEQ() {
+	if (getFlag(Z) == 1) {
+		//add a cycle for branch
+		cycles++;
+		//set abs address to pc + jump offset 
+		addr_abs = pc + addr_rel;
+		// if page boundary cross add a cycle
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+//branch if not equal
+uint8_t CPU6502::BNE() {
+	if (getFlag(Z) == 0) {
+		//add a cycle for branch
+		cycles++;
+		//set abs address to pc + jump offset 
+		addr_abs = pc + addr_rel;
+		// if page boundary cross add a cycle
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+//branch if positive
+uint8_t CPU6502::BPL() {
+	if (getFlag(N) == 0) {
+		//add a cycle for branch
+		cycles++;
+		//set abs address to pc + jump offset 
+		addr_abs = pc + addr_rel;
+		// if page boundary cross add a cycle
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+//branch if negative
+uint8_t CPU6502::BMI() {
+	if (getFlag(N) == 1) {
+		//add a cycle for branch
+		cycles++;
+		//set abs address to pc + jump offset 
+		addr_abs = pc + addr_rel;
+		// if page boundary cross add a cycle
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+//branch if overflow
+uint8_t CPU6502::BVC() {
+	if (getFlag(V) == 0) {
+		//add a cycle for branch
+		cycles++;
+		//set abs address to pc + jump offset 
+		addr_abs = pc + addr_rel;
+		// if page boundary cross add a cycle
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+//branch if no overflow
+uint8_t CPU6502::BVS() {
+	if (getFlag(V) == 1) {
+		//add a cycle for branch
+		cycles++;
+		//set abs address to pc + jump offset 
+		addr_abs = pc + addr_rel;
+		// if page boundary cross add a cycle
+		if ((addr_abs & 0xFF00) != (pc & 0xFF00)) {
+			cycles++;
+		}
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+// end of branching instructions
+
+//problematic instructions addition and subtraction
+// idea is fetch data and cary bit then add or subtract it from accumulator
+//including cary bit alllows a chain of 8 bit additions that can from a larger digit
+/*
+   A = 250
+   M = 10
+   will cause over flow so just add low bytes will spit out carry then just add it to the high byte
+
+   // the caveat is desingners thought that programmers may want to use signed numbers which will reduce the size of values that can be represented
+   // truth table evaluation we get overflow v = ((A^R) & (~ (A^M)))
+      these have the capability to add an additional cycle
+   */
+uint8_t CPU6502::ADC() {
+	fetch();
+	uint16_t temp = (uint16_t) a + (uint16_t) getFlag(C) + (uint16_t) fetched;
+	//if temp is more than 255 set cary bit
+	setFlag(C, temp > 255);
+	//if low byte is zero set zero flag
+	setFlag(Z, (temp & 0x00FF) == 0);
+	setFlag(N, temp & 0x80);
+	//overflow v = ((A^R) & (~ (A^M)))
+	setFlag(V,  ( ~( (uint16_t)a ^ (uint16_t) fetched) & ((uint16_t)a ^ temp)) & 0x0080);
+	//set the low 8 bits
+	a = temp & 0x00FF;
+	return 1;
+}
+//A = A - M - (1-c) -> A = A - (M - (1-c)) -> A = A - M + c + 1
+uint8_t CPU6502::SBC() {
+	fetch();
+	//ivert bottom 8 bits of M to -M
+	uint16_t val = ((uint16_t)fetched) ^ 0x00FF;
+	uint16_t temp = (uint16_t)a + (uint16_t)getFlag(C) + val;
+	setFlag(C, temp &  0xFF00);
+	//if low byte is zero set zero flag
+	setFlag(Z, (temp & 0x00FF) == 0);
+	setFlag(N, temp & 0x80);
+	//overflow v = ((A^R) & ((A^M)))
+	setFlag(V,   ((temp ^ (uint16_t) a )  & (temp ^ val)) & 0x0080 );
+	//set low 8 bits
+	a = temp & 0x00FF;
+	return 1;
+}
+//stack instrucutions
+//push
+uint8_t CPU6502::PHA() {
+   //write to the stack     (0x0100) is a hardcoded value where the memory for stack starts
+	write(0x0100 + sp, a);  // push accumulator onto stack
+	//decrement stack
+	sp--;
+	return 0;
+}
+//pop
+uint8_t CPU6502::PHA() {
+	sp++;
+	//write to the stack     (0x0100) is a hardcoded value where the memory for stack starts
+	read(0x0100 + sp);  // read stack at sp
+	//set zero and negative flags
+	setFlag(N, a & 0x80);
+	setFlag(C, a == 0x00);
+	return 0;
+}
+// interuots
+//maskable
+void CPU6502::irq() {
+	//only trigger if interupts are disabled
+	if (getFlag(I) == 0) {
+		//run code to servie interrupt 
+		// 1. write lo and hi to stkptr 
+		//low end
+		write(0x0100 + sp, (pc >> 8) & 0x00FF);
+		sp--;
+		//high end
+		write(0x0100 + sp, pc & 0x00FF);
+		sp--;
+		// 2. set flags
+		setFlag(U, 1);
+		setFlag(B, 0);
+		// 3. write to status
+		write(0x0100 + sp, status);
+		sp--;
+		//disable interupts
+		setFlag(I, 1);
+		//read new pc from irq vector
+		addr_abs = 0xFFFE;
+		uint16_t lo = read(addr_abs), hi = read(addr_abs + 1);		
+		pc = (hi << 8) | lo;
+		//takes 7 cycles
+		cycles = 7;
+	}
+}
+// non maskable
+void CPU6502::nmi() {
+	//push pc to stack
+	write(0x0100 + sp, (pc >> 8) & 0x00FF);
+	sp--;
+	write(0x0100 + sp, pc & 0x00FF);
+	sp--;
+	//clear break and unused bit flags set status
+	setFlag(U, 1);
+	setFlag(B, 0);
+	write(0x0100 + sp, status);
+	sp--;
+	//set interupt disable 
+	setFlag(I, 1);
+	//read new pc from nmi vector
+	addr_abs = 0xFFFA;
+
+	uint16_t lo = read(addr_abs), hi = read(addr_abs + 1);
+	pc = ( hi << 8) | lo;
+	//takes 8 cycles
+	cycles = 8;
+}
+//return interrupt
+uint8_t CPU6502::RTI() {
+	//get status
+	sp++;
+	status = read(0x0100 + sp);
+	//reset flags
+	status &= ~B;
+	status &= ~U;
+	sp++;
+	//get pc 
+	pc = (uint16_t)read(0x0100 + sp);
+	sp++;
+	pc |= (uint16_t)read(0x0100 + sp) << 8;
+	return 0;
+}
