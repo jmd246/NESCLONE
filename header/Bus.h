@@ -13,7 +13,6 @@ public:
     Bus();
     ~Bus();
     
-    std::array<uint8_t, 64 * 1024>  memory;
     uint8_t read(uint16_t a, bool mode = false);
     
     void write(uint16_t a, uint8_t d);

@@ -200,11 +200,11 @@ uint8_t CPU6502::ACC() {
 }
 //instructions
 uint8_t CPU6502::fetch() {
-	if (lookup[opcode].addrmode != IMM && lookup[opcode].addrmode != ACC) {
+	if (lookup[opcode].addrmode != &CPU6502::IMM && lookup[opcode].addrmode != &CPU6502::ACC) {
 		//get value instruction will use from the address
 		fetched = read(addr_abs);
 	}
-	else if (lookup[opcode].addrmode == ACC) {
+	else if (lookup[opcode].addrmode == &CPU6502::ACC) {
 		fetched = a;
 	}
 	return fetched;
@@ -561,7 +561,7 @@ uint8_t CPU6502::DEC() {
 
 uint8_t CPU6502::ROR() {
 	//carry bit is value of bit 0
-	if (lookup[opcode].addrmode == ACC) {
+	if (lookup[opcode].addrmode == &CPU6502::ACC) {
 		uint8_t carryIn = getFlag(C) << 7;
 		//save bit 0 into carry
 		setFlag(C, a & 0x01);
@@ -583,7 +583,7 @@ uint8_t CPU6502::ROR() {
 	return 0;
 }
 uint8_t CPU6502::ROL() {
-	if (lookup[opcode].addrmode == ACC) {
+	if (lookup[opcode].addrmode == &CPU6502::ACC) {
 		uint8_t carryIn = getFlag(C);
 		//save bit 7 into carry
 		setFlag(C, a & 0x80);

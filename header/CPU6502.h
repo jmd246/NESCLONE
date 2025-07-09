@@ -54,7 +54,7 @@ private:
 	uint8_t	ABS();	uint8_t	ABX();
 	uint8_t	ABY();  uint8_t	IND();
 	uint8_t	IZX();	uint8_t	IZY();
-
+	uint8_t ACC();
 	
 
 	// Official 6502 instructions

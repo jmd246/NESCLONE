@@ -1,2 +1,17 @@
-﻿  main.cpp
-  NESClone.vcxproj -> C:\Users\Owner\OneDrive\Desktop\NESClone\x64\Debug\NESClone.exe
+﻿  Bus.cpp
+  CPU6502.cpp
+  Generating Code...
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(176): error C4716: 'CPU6502::IZX': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(631): error C4716: 'CPU6502::JMP': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(660): error C4716: 'CPU6502::CPY': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(657): error C4716: 'CPU6502::CPX': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(663): error C4716: 'CPU6502::LDX': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(666): error C4716: 'CPU6502::LDY': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(669): error C4716: 'CPU6502::LDA': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(672): error C4716: 'CPU6502::BIT': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(675): error C4716: 'CPU6502::BRK': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(678): error C4716: 'CPU6502::ASL': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(681): error C4716: 'CPU6502::TXA': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(684): error C4716: 'CPU6502::TYA': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(687): error C4716: 'CPU6502::CMP': must return a value
+C:\Users\Owner\OneDrive\Desktop\NESClone\source\CPU6502.cpp(690): error C4716: 'CPU6502::JSR': must return a value
